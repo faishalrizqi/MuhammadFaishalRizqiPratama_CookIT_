@@ -156,13 +156,12 @@ fun ScreenContent(
     onDeleteRequest: (Resep) -> Unit,
     onEditRequest: (Resep) -> Unit
 ) {
-    val data by viewModel.resepData
+
+    val data by viewModel.resepState.collectAsState()
     val status by viewModel.apiStatus.collectAsState()
 
-    val userIdForApi = if (userId.isEmpty()) null else userId
-
-    LaunchedEffect(userIdForApi) {
-        viewModel.retrieveData(userIdForApi)
+    LaunchedEffect(userId) {
+        viewModel.retrieveData(userId)
     }
 
     when (status) {
@@ -182,7 +181,7 @@ fun ScreenContent(
             ) {
                 Text(text = stringResource(id = R.string.error))
                 Button(
-                    onClick = { viewModel.retrieveData(userIdForApi) },
+                    onClick = { viewModel.retrieveData(userId) },
                     modifier = Modifier.padding(top = 16.dp),
                     contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
                 ) {
@@ -192,7 +191,9 @@ fun ScreenContent(
         }
         ApiStatus.SUCCESS -> {
             LazyVerticalGrid(
-                modifier = modifier.fillMaxSize().padding(4.dp),
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
@@ -230,7 +231,7 @@ fun ListItem(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(ResepApi.getImageUrl(resep.imageId))
+                    .data(ResepApi.getImageUrl(resep.imageId ?: ""))
                     .crossfade(true)
                     .build(),
                 contentDescription = stringResource(R.string.gambar_resep, resep.judul),
@@ -243,7 +244,7 @@ fun ListItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(4.dp),
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {

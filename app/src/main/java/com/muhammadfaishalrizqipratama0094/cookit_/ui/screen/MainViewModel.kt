@@ -3,11 +3,18 @@ package com.muhammadfaishalrizqipratama0094.cookit_.ui.screen
 import android.graphics.Bitmap
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
+import com.muhammadfaishalrizqipratama0094.cookit_.ResepApplication
 import com.muhammadfaishalrizqipratama0094.cookit_.model.Resep
 import com.muhammadfaishalrizqipratama0094.cookit_.network.ResepApi
+import com.muhammadfaishalrizqipratama0094.cookit_.repository.ResepRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -16,24 +23,29 @@ import java.io.ByteArrayOutputStream
 
 enum class ApiStatus { LOADING, SUCCESS, FAILED }
 
-class MainViewModel : ViewModel() {
+class MainViewModel(private val repository: ResepRepository) : ViewModel() {
 
-    var resepData = mutableStateOf<List<Resep>>(emptyList())
-        private set
+    val resepState: StateFlow<List<Resep>> = repository.allResep
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
     var apiStatus = MutableStateFlow(ApiStatus.LOADING)
         private set
     var errorMessage = mutableStateOf<String?>(null)
         private set
 
     fun getResepById(resepId: String): Resep? {
-        return resepData.value.find { it.id == resepId }
+        return resepState.value.find { it.id == resepId }
     }
 
     fun retrieveData(userId: String?) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             apiStatus.value = ApiStatus.LOADING
             try {
-                resepData.value = ResepApi.service.getResep(userId)
+                repository.refreshResep(userId)
                 apiStatus.value = ApiStatus.SUCCESS
             } catch (e: Exception) {
                 errorMessage.value = "Error: ${e.message}"
@@ -62,7 +74,7 @@ class MainViewModel : ViewModel() {
                     image = bitmap.toMultipartBody()
                 )
                 if (result.status == "success") {
-                    retrieveData(userId)
+                    repository.refreshResep(userId)
                     launch(Dispatchers.Main) { onSuccess() }
                 } else {
                     throw Exception(result.message)
@@ -95,7 +107,7 @@ class MainViewModel : ViewModel() {
                     image = bitmap?.toMultipartBody()
                 )
                 if (result.status == "success") {
-                    retrieveData(userId)
+                    repository.refreshResep(userId)
                     launch(Dispatchers.Main) { onSuccess() }
                 } else {
                     throw Exception(result.message)
@@ -111,7 +123,7 @@ class MainViewModel : ViewModel() {
             try {
                 val result = ResepApi.service.deleteResep(userId, resepId)
                 if (result.status == "success") {
-                    retrieveData(userId)
+                    repository.refreshResep(userId)
                 } else {
                     throw Exception(result.message)
                 }
@@ -131,5 +143,15 @@ class MainViewModel : ViewModel() {
 
     fun clearMessage() {
         errorMessage.value = null
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val application = (checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as ResepApplication)
+                return MainViewModel(application.container.resepRepository) as T
+            }
+        }
     }
 }
