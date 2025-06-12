@@ -1,9 +1,12 @@
 package com.muhammadfaishalrizqipratama0094.cookit_.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import com.squareup.moshi.Json
 
+@Entity(tableName = "resep")
 data class Resep(
-    val id: String,
+    @PrimaryKey val id: String,
     val judul: String,
     val deskripsi: String,
     @Json(name = "bahanBahan") val bahan: String,
